@@ -1,3 +1,4 @@
 .env
 data/*.db
 reports/*.md
+__pycache__/
