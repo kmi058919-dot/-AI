@@ -1,10 +1,15 @@
 """日本株デイリーレポート生成（メイン処理）"""
+import argparse
 import logging
 import os
+import time
 from datetime import datetime
 
 import pandas as pd
+import requests
+import schedule
 
+import config
 from tools.news import run_news_analysis
 from tools.portfolio import calc_pnl, check_stop_loss, fetch_current_prices, get_holdings
 from tools.screener import run_screener
@@ -20,6 +25,12 @@ REQUIRED_ANALYSIS_COLUMNS = {
     "決算リスク": pd.NA,
     "決算発表日": pd.NA,
 }
+
+RUN_TIME = "07:30"
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+
+# J-Quants取引カレンダーAPIのHolidayDivision値（V1の仕様に準拠：1=営業日、2=半日立会、3=非営業日でも取引あり）
+TRADING_DAY_DIVISIONS = {"1", "2", "3"}
 
 
 def _format_currency(value):
@@ -186,6 +197,105 @@ def main():
     print(f"✅ レポート生成完了：{output_path}")
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+def _setup_logging():
+    """コンソールと logs/YYYY-MM-DD.log の両方にログを出力するよう設定する（日付が変わったら呼び直す）"""
+    os.makedirs("logs", exist_ok=True)
+    log_path = f"logs/{datetime.now().strftime('%Y-%m-%d')}.log"
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+
+    formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+
+
+def is_trading_day(date_str=None):
+    """指定日（省略時は今日）がJ-Quants取引カレンダー上の取引日かどうかを判定する
+
+    APIから判定できない場合は、平日（月〜金）であれば取引日とみなすフォールバックを行う。
+    """
+    date_str = date_str or datetime.now().strftime("%Y-%m-%d")
+    is_weekday = datetime.strptime(date_str, "%Y-%m-%d").weekday() < 5
+
+    url = f"{config.JQUANTS_BASE_URL}/markets/trading-calendar"
+    try:
+        response = requests.get(url, headers=config.get_headers(), params={"date": date_str})
+        response.raise_for_status()
+        data = response.json()
+        records = data.get("trading_calendar", data.get("calendar", [])) if isinstance(data, dict) else data
+    except Exception as e:
+        logger.warning("取引カレンダーの取得に失敗したため、平日判定で代用します：%s", e)
+        return is_weekday
+
+    for record in records:
+        if record.get("Date") == date_str:
+            return str(record.get("HolidayDivision", "")) in TRADING_DAY_DIVISIONS
+
+    logger.warning("取引カレンダーに%sのレコードが無いため、平日判定で代用します", date_str)
+    return is_weekday
+
+
+def scheduled_job():
+    """スケジュール実行用ジョブ：取引日（平日かつ祝日でない日）であればレポート生成を実行する"""
+    _setup_logging()
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    if datetime.now().weekday() >= 5:
+        logger.info("本日（%s）は土日のため実行をスキップします", today_str)
+        return
+
+    if not is_trading_day(today_str):
+        logger.info("本日（%s）は祝日等の休場日のため実行をスキップします", today_str)
+        return
+
+    logger.info("本日（%s）は取引日のため自動実行を開始します", today_str)
     main()
+
+
+def _format_next_run(scheduled_time=RUN_TIME):
+    """次回実行予定時刻を「HH:MM」形式の文字列で返す"""
+    next_run = schedule.next_run()
+    return next_run.strftime("%H:%M") if next_run else scheduled_time
+
+
+def run_daemon():
+    """平日7:30に自動実行するデーモンモードを起動する（バックグラウンド常駐）"""
+    for weekday in WEEKDAYS:
+        getattr(schedule.every(), weekday).at(RUN_TIME).do(scheduled_job)
+
+    print(f"🚀 投資エージェント起動 次の実行：{_format_next_run()}")
+    logger.info("デーモンモードで起動しました（平日%s実行）。次回実行予定：%s", RUN_TIME, _format_next_run())
+
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+
+def parse_args():
+    """コマンドライン引数を解析する（--daemonでバックグラウンド自動実行モード）"""
+    parser = argparse.ArgumentParser(description="投資AIエージェント")
+    parser.add_argument(
+        "--daemon", action="store_true",
+        help="バックグラウンド自動実行モード（平日7:30に自動実行、休場日は取引カレンダーで判定してスキップ）",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    _setup_logging()
+
+    if args.daemon:
+        run_daemon()
+    else:
+        logger.info("即時実行モードで起動しました")
+        main()
