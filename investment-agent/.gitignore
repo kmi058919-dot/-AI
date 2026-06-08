@@ -1,4 +1,5 @@
 .env
 data/*.db
 reports/*.md
+logs/*.log
 __pycache__/
