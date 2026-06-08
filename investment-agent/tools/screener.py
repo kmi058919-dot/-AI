@@ -9,6 +9,8 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# 市場区分の列名は実APIレスポンスでは「MktNm」（例："プライム市場"のように"市場"が付く場合があるため部分一致で判定する）
+MARKET_COLUMN = "MktNm"
 TARGET_MARKETS = ["プライム", "スタンダード"]
 VOLUME_RATIO_THRESHOLD = 1.5
 MIN_PRICE = 500
@@ -38,11 +40,12 @@ def fetch_listed_companies():
         logger.error("銘柄一覧の取得に失敗しました：%s", e)
         return pd.DataFrame()
 
-    if "MarketCodeName" not in df.columns:
-        logger.error("MarketCodeName列が見つかりませんでした：%s", list(df.columns))
+    if MARKET_COLUMN not in df.columns:
+        logger.error("%s列が見つかりませんでした：%s", MARKET_COLUMN, list(df.columns))
         return pd.DataFrame()
 
-    return df[df["MarketCodeName"].isin(TARGET_MARKETS)].reset_index(drop=True)
+    pattern = "|".join(TARGET_MARKETS)
+    return df[df[MARKET_COLUMN].str.contains(pattern, na=False)].reset_index(drop=True)
 
 
 def fetch_daily_bars(date):
@@ -109,8 +112,8 @@ def run_screener():
                 company = companies.loc[companies["Code"] == code].iloc[0]
                 passed.append({
                     "Code": code,
-                    "CompanyName": company.get("CompanyName"),
-                    "MarketCodeName": company.get("MarketCodeName"),
+                    "CompanyName": company.get("CoName"),
+                    "MarketCodeName": company.get(MARKET_COLUMN),
                     "Date": latest["Date"],
                     "Close": latest["Close"],
                     "Volume": latest["Volume"],
