@@ -104,7 +104,7 @@ def fetch_current_prices(codes):
             response = requests.get(url, headers=config.get_headers(), params={"code": code, "date": date})
             response.raise_for_status()
             data = response.json()
-            bars = data.get("daily_bars", data.get("bars", [])) if isinstance(data, dict) else data
+            bars = data.get("data", data.get("daily_bars", data.get("bars", []))) if isinstance(data, dict) else data
             if bars:
                 records.append({"Code": code, "Close": bars[-1].get("Close")})
         except Exception as e:

@@ -33,7 +33,7 @@ def fetch_listed_companies():
         response = requests.get(url, headers=config.get_headers())
         response.raise_for_status()
         data = response.json()
-        df = pd.DataFrame(data.get("equities", data) if isinstance(data, dict) else data)
+        df = pd.DataFrame(data.get("data", data.get("equities", data)) if isinstance(data, dict) else data)
     except Exception as e:
         logger.error("銘柄一覧の取得に失敗しました：%s", e)
         return pd.DataFrame()
@@ -52,7 +52,7 @@ def fetch_daily_bars(date):
         response = requests.get(url, headers=config.get_headers(), params={"date": date})
         response.raise_for_status()
         data = response.json()
-        bars = data.get("daily_bars", data.get("bars", [])) if isinstance(data, dict) else data
+        bars = data.get("data", data.get("daily_bars", data.get("bars", []))) if isinstance(data, dict) else data
         return pd.DataFrame(bars)
     except Exception as e:
         logger.warning("%sの株価データ取得に失敗しました：%s", date, e)

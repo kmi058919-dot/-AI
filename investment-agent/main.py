@@ -194,7 +194,7 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(report)
 
-    print(f"✅ レポート生成完了：{output_path}")
+    print(f"[完了] レポート生成完了：{output_path}")
 
 
 def _setup_logging():
@@ -231,7 +231,10 @@ def is_trading_day(date_str=None):
         response = requests.get(url, headers=config.get_headers(), params={"date": date_str})
         response.raise_for_status()
         data = response.json()
-        records = data.get("trading_calendar", data.get("calendar", [])) if isinstance(data, dict) else data
+        records = (
+            data.get("data", data.get("trading_calendar", data.get("calendar", [])))
+            if isinstance(data, dict) else data
+        )
     except Exception as e:
         logger.warning("取引カレンダーの取得に失敗したため、平日判定で代用します：%s", e)
         return is_weekday
@@ -272,7 +275,7 @@ def run_daemon():
     for weekday in WEEKDAYS:
         getattr(schedule.every(), weekday).at(RUN_TIME).do(scheduled_job)
 
-    print(f"🚀 投資エージェント起動 次の実行：{_format_next_run()}")
+    print(f"[起動] 投資エージェント起動 次の実行：{_format_next_run()}")
     logger.info("デーモンモードで起動しました（平日%s実行）。次回実行予定：%s", RUN_TIME, _format_next_run())
 
     while True:

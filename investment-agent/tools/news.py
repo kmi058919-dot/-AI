@@ -42,7 +42,10 @@ def fetch_earnings_calendar():
         response = requests.get(url, headers=config.get_headers())
         response.raise_for_status()
         data = response.json()
-        records = data.get("earnings_calendar", data.get("earnings", [])) if isinstance(data, dict) else data
+        records = (
+            data.get("data", data.get("earnings_calendar", data.get("earnings", [])))
+            if isinstance(data, dict) else data
+        )
         return pd.DataFrame(records)
     except Exception as e:
         logger.error("決算発表予定の取得に失敗しました：%s", e)
