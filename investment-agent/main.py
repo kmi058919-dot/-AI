@@ -191,7 +191,7 @@ def main():
     today = datetime.now().strftime("%Y-%m-%d")
     os.makedirs("reports", exist_ok=True)
     output_path = f"reports/{today}.md"
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(output_path, "w", encoding="utf-8-sig") as f:
         f.write(report)
 
     print(f"[完了] レポート生成完了：{output_path}")
