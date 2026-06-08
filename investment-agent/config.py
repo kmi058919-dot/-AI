@@ -12,7 +12,7 @@ JQUANTS_BASE_URL = "https://api.jquants.com/v2"
 # 候補名から内部標準名（Close/Volume）へ正規化する（MktNm/CoNameと同様の命名傾向を考慮した候補）
 PRICE_COLUMN_CANDIDATES = {
     "Close": ["Close", "ClosePrice", "Cl", "CloseVal", "C", "close"],
-    "Volume": ["Volume", "TradingVolume", "Vol", "TrdVol", "V", "volume"],
+    "Volume": ["Volume", "Vo", "TradingVolume", "Vol", "TrdVol", "V", "volume"],
 }
 
 
