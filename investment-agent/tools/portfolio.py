@@ -161,7 +161,7 @@ def calc_pnl(current_prices_df):
     merged["含み損益率"] = ((merged["Close"] - merged["buy_price"]) / merged["buy_price"] * 100).round(2)
 
     return (
-        merged[["code", "name", "buy_price", "quantity", "Close", "含み損益額", "含み損益率"]]
+        merged[["code", "name", "buy_price", "quantity", "Close", "stop_loss", "含み損益額", "含み損益率"]]
         .rename(columns={"Close": "現在値"})
         .reset_index(drop=True)
     )
