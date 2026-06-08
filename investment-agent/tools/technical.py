@@ -30,12 +30,14 @@ def fetch_price_history(code, days=HISTORY_DAYS):
         response.raise_for_status()
         data = response.json()
         bars = data.get("data", data.get("daily_bars", data.get("bars", []))) if isinstance(data, dict) else data
-        df = pd.DataFrame(bars)
+        df = config.normalize_price_columns(pd.DataFrame(bars))
     except Exception as e:
         logger.warning("%sの株価データ取得に失敗しました：%s", code, e)
         return pd.DataFrame()
 
     if df.empty or "Date" not in df.columns or "Close" not in df.columns:
+        if not df.empty:
+            logger.error("%sの株価データの列名（Close）を特定できませんでした：%s", code, list(df.columns))
         return pd.DataFrame()
 
     return df.sort_values("Date").tail(days).reset_index(drop=True)

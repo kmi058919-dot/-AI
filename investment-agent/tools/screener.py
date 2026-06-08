@@ -49,14 +49,17 @@ def fetch_listed_companies():
 
 
 def fetch_daily_bars(date):
-    """指定日の全銘柄の四本値・出来高を取得する"""
+    """指定日の全銘柄の四本値・出来高を取得する（列名は内部標準名Close/Volumeに正規化して返す）"""
     url = f"{config.JQUANTS_BASE_URL}/equities/bars/daily"
     try:
         response = requests.get(url, headers=config.get_headers(), params={"date": date})
         response.raise_for_status()
         data = response.json()
         bars = data.get("data", data.get("daily_bars", data.get("bars", []))) if isinstance(data, dict) else data
-        return pd.DataFrame(bars)
+        df = config.normalize_price_columns(pd.DataFrame(bars))
+        if not df.empty and ("Close" not in df.columns or "Volume" not in df.columns):
+            logger.error("四本値・出来高データの列名（Close/Volume）を特定できませんでした：%s", list(df.columns))
+        return df
     except Exception as e:
         logger.warning("%sの株価データ取得に失敗しました：%s", date, e)
         return pd.DataFrame()

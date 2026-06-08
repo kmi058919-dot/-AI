@@ -105,8 +105,11 @@ def fetch_current_prices(codes):
             response.raise_for_status()
             data = response.json()
             bars = data.get("data", data.get("daily_bars", data.get("bars", []))) if isinstance(data, dict) else data
-            if bars:
-                records.append({"Code": code, "Close": bars[-1].get("Close")})
+            bars_df = config.normalize_price_columns(pd.DataFrame(bars))
+            if not bars_df.empty and "Close" in bars_df.columns:
+                records.append({"Code": code, "Close": bars_df.iloc[-1]["Close"]})
+            elif bars:
+                logger.error("%sの株価データの列名（Close）を特定できませんでした：%s", code, list(bars_df.columns))
         except Exception as e:
             logger.warning("%sの現在値取得に失敗しました：%s", code, e)
             continue
